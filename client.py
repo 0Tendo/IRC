@@ -5,7 +5,7 @@ import sys
 import select
 import errno
 
-HOST = '127.0.0.1'
+HOST = '173.255.245.163'
 PORT = 8080
 BUFFER_SIZE = 102400 
 HEADER_LEN = 10           
