@@ -46,7 +46,7 @@ while True:
             message_length = int(message_header.decode('utf-8').strip())
             message = client.recv(message_length).decode('utf-8')
 
-            print(f'{username} > {message}')
+            print(f'{username} : {message}')
 
     except IOError as e:
         if e.errno != errno.EAGAIN and e.errno != errno.EWOULDBLOCK:

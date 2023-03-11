@@ -8,7 +8,7 @@ import select
 
 
 
-HOST = '173.255.245.163'
+HOST = '127.0.0.1'
 PORT = 8080
 BUFFER = 102400
 HEADER_LEN = 10
