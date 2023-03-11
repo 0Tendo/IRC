@@ -1,4 +1,5 @@
 #server side program for internet relay chat program
+#handles multiple connections
 
 import socket
 import select
@@ -12,6 +13,7 @@ import select
 HOST = '127.0.0.1'
 PORT = 8080
 BUFFER = 102400
+HEADER_LEN = 10
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
@@ -34,7 +36,7 @@ def recieve_msg(client):
         if not len(msg_header):
             return False
         msg_length = int(msg_header.decode('utf-8'))
-        return {'header': msg_header, 'data': client.recv(msg_length)}
+        return {'header': msg_header, 'data': client.recv(msg_length).strip()}
 
     except:
         return False
@@ -43,8 +45,8 @@ def recieve_msg(client):
 while True:
     read_sockets, _, exception_sockets = select.select(user_list, [], user_list)
 
-    for notified_socket in read_sockets:
-        if notified_socket == server:
+    for universal_socket in read_sockets:
+        if universal_socket == server:
             client, client_address = server.accept()
             user = recieve_msg(client)
             if user is False:
@@ -53,14 +55,18 @@ while True:
             client_list[client] = user
             print(f'New connection from {client_address[0]}:{client_address[1]} username: {user["data"].decode("utf-8")}')
         else:
-            msg = recieve_msg(notified_socket)
+            msg = recieve_msg(universal_socket)
             if msg is False:
-                print(f'Closed connection from {client_list[notified_socket]["data"].decode("utf-8")}')
-                user_list.remove(notified_socket)
-                del client_list[notified_socket]
+                print(f'Closed connection from {client_list[universal_socket]["data"].decode("utf-8")}')
+                user_list.remove(universal_socket)
+                del client_list[universal_socket]
                 continue
-            user = client_list[notified_socket]
+            user = client_list[universal_socket]
             print(f'Received message from {user["data"].decode("utf-8")}: {msg["data"].decode("utf-8")}')
             for client in client_list:
-                if client != notified_socket:
+                if client != universal_socket:
                     client.send(user['header'] + user['data'] + msg['header'] + msg['data'])
+
+    for universal_socket in exception_sockets:
+        user_list.remove(universal_socket)
+        del client_list[universal_socket]
