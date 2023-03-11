@@ -8,8 +8,6 @@ import select
 
 
 
-## Main Program ##
-
 HOST = '127.0.0.1'
 PORT = 8080
 BUFFER = 102400
@@ -32,7 +30,7 @@ client_list = {}
 # a function to recieve message from client
 def recieve_msg(client):
     try:
-        msg_header = client.recv(BUFFER)
+        msg_header = client.recv(HEADER_LEN)
         if not len(msg_header):
             return False
         msg_length = int(msg_header.decode('utf-8'))
