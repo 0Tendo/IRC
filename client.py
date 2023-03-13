@@ -1,26 +1,24 @@
-#client side program for internet relay chat program
-
 import socket
 import sys
-import select
 import errno
 
-HOST = '173.255.245.163'
+# server: 173.255.245.163
+HOST = '127.0.0.1'
 PORT = 8080
-BUFFER_SIZE = 102400 
-HEADER_LEN = 10           
-USERNAME = 'undefined_user'     
+HEADER_LEN = 11
+USERNAME = 'undefined_user'
 
 # assign username
 username = input("Enter your username: ")
 
-client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 # connect to server
+client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect((HOST, PORT))
 client.setblocking(False)
 
-username_header = f"{len(username):<{HEADER_LEN}}".encode('utf-8')
-client.send(username_header + username.encode('utf-8'))
+# encode username and opcode fields for message header
+username_bytes = username.encode('utf-8')
+opcode_bytes = b'\x00' # initialize opcode to 0
 
 while True:
     # send messages
@@ -28,25 +26,36 @@ while True:
 
     # check if message is not empty
     if message:
-        message_header = f"{len(message):<{HEADER_LEN}}".encode('utf-8')
-        client.send(message_header + message.encode('utf-8'))
+        # encode message and update length and opcode fields in message header
+        message_bytes = message.encode('utf-8')
+        length_bytes = f"{len(username_bytes) + len(opcode_bytes) + len(message_bytes):<{HEADER_LEN}}".encode('utf-8')
+        header_bytes = length_bytes + opcode_bytes
+        
+        # send message header and message payload to server
+        client.sendall(header_bytes + username_bytes + message_bytes)
 
     try:
         while True:
             # receive messages
-            username_header = client.recv(HEADER_LEN)
-            if not len(username_header):
+            header = client.recv(HEADER_LEN + 1) # receive entire header (length field + opcode field)
+            if not len(header):
                 print('Connection error. Server closed.')
                 sys.exit()
 
-            user_len = int(username_header.decode('utf-8').strip())
-            username = client.recv(user_len).decode('utf-8')
+            # extract opcode field from message header
+            opcode = header[-1]
+            
+            # extract username and message data from received bytes
+            username_header = client.recv(HEADER_LEN)
+            username_length = int(username_header.decode('utf-8').strip())
+            username = client.recv(username_length).decode('utf-8')
 
             message_header = client.recv(HEADER_LEN)
-            message_length = int(message_header.decode('utf-8').strip())
+            message_length = int(message_header.decode('utf-8').strip()) - 1 # subtract 1 to exclude opcode byte
             message = client.recv(message_length).decode('utf-8')
 
-            print(f'{username} : {message}')
+            # print message with opcode field included
+            print(f'Opcode {opcode}: {username} : {message}')
 
     except IOError as e:
         if e.errno != errno.EAGAIN and e.errno != errno.EWOULDBLOCK:
@@ -57,4 +66,3 @@ while True:
     except Exception as e:
         print('General error', str(e))
         sys.exit()
-
