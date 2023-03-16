@@ -1,14 +1,12 @@
 #a basic client for an IRC chatroom
 #this is the client side of the chatroom
 import socket  
-import select  
 import sys     
 import threading
 
 
 HOST = '127.0.0.1'  
-PORT = 8080         
-SOCKET_LIST = []   
+PORT = 8080          
 RECV_BUFFER = 4096 
 
 opcodes = {
@@ -51,11 +49,13 @@ def main():
                 elif data.startswith('/join'):
                     server.send(('JOIN ' + data[6:]).encode('utf-8'))
                 elif data.startswith('/leave'):
-                    server.send('LEAVE\n'.encode('utf-8'))  # Remove the additional data
+                    server.send(('LEAVE ' + data[7:]).encode('utf-8'))
                 elif data.startswith('/quit'):
                     server.send('QUIT\n'.encode('utf-8'))
                     break
                     sys.exit()
+                elif data.startswith('/help'):
+                    print('List of commands:\n/list\n/nick\n/join\n/leave\n/quit\n/help')
                 else:
                     server.send(('MSG ' + data).encode('utf-8'))
         except:

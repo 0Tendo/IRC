@@ -13,62 +13,66 @@ PORT = 8080
 SOCKET_LIST = []
 RECV_BUFFER = 4096
 CHATROOM = {}
+CLIENT_CHATROOMS = {}
 NICKNAMES = {}
 
 
-# Set up server socket
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-# Set socket option to allow reuse of address in case of restart
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
-# Bind socket to specified address and port
 server.bind((HOST, PORT))
-
-# Start listening for incoming connections, with a maximum backlog of 10 connections
 server.listen(10)
-
-# Add server socket to list of sockets to listen for incoming data
 SOCKET_LIST.append(server)
 
 # Define functions for each opcode
 
 # Join a chatroom
 def join_chatroom(client, data):
-    if client in CHATROOM:
-        client.send(b'You are already in a chatroom')
+    if client not in CLIENT_CHATROOMS:
+        CLIENT_CHATROOMS[client] = []
+        
+    if data in CLIENT_CHATROOMS[client]:
+        CLIENT_CHATROOMS[client].remove(data)
+        client.send(b'You are now sending messages in: ' + data.encode('utf-8'))
     else:
-        CHATROOM[client] = data
-        client.send(b'You have joined the chatroom: ' + data.encode('utf-8'))
+        client.send(b'You have joined and are now sending messages in: ' + data.encode('utf-8'))
+        
+    CLIENT_CHATROOMS[client].append(data)
 
 # Leave a chatroom
 def leave_chatroom(client, data):
-    if client in CHATROOM:
-        del CHATROOM[client]
+    if client in CLIENT_CHATROOMS and data in CLIENT_CHATROOMS[client]:
+        CLIENT_CHATROOMS[client].remove(data)
         client.send(b'You have left the chatroom: ' + data.encode('utf-8'))
     else:
-        client.send(b'You are not in a chatroom')
+        client.send(b'You are not in this chatroom')
 
 # Send a message to all clients in a chatroom
 def send_message(client, data):
-    if client in CHATROOM:
-        chatroom = CHATROOM[client]
-        for sock, room in CHATROOM.items():
-            if room == chatroom and sock != client:
+    if client in CLIENT_CHATROOMS:
+        last_joined_chatroom = CLIENT_CHATROOMS[client][-1]
+        for sock in SOCKET_LIST:
+            if sock != server and sock != client and last_joined_chatroom in CLIENT_CHATROOMS.get(sock, []):
                 # Use NICKNAMES to get the sender's nickname
                 sender = NICKNAMES.get(client, "Anonymous")
-                message = sender + ': ' + data
+                message = '[' + last_joined_chatroom + '] ' + sender + ': ' + data
                 sock.send(message.encode('utf-8'))
     else:
-        client.send(b'You are not in a chatroom')
+        client.send(b'You are not in any chatroom.\n type /help to see a list of commands.')
 
 # List all chatrooms
 def list_chatrooms(client, data):
-    if CHATROOM:
-        chatroom_list = 'Chatrooms: ' + ', '.join(set(CHATROOM.values()))
-        client.send((chatroom_list + '\n').encode('utf-8'))
+    all_chatrooms = set()
+    for chatroom_list in CLIENT_CHATROOMS.values():
+        all_chatrooms.update(chatroom_list)
+
+    all_chatrooms_list = 'All chatrooms on the server: ' + ', '.join(all_chatrooms)
+    client.send((all_chatrooms_list + '\n').encode('utf-8'))
+
+    if client in CLIENT_CHATROOMS:
+        user_chatrooms_list = 'You are in the following chatrooms: ' + ', '.join(CLIENT_CHATROOMS[client])
+        client.send((user_chatrooms_list + '\n').encode('utf-8'))
     else:
-        client.send(b'There are no chatrooms')
+        client.send(b'You are not in any chatrooms')
 
 # Change nickname
 def change_nick(client, data):
@@ -129,9 +133,6 @@ def main():
                 SOCKET_LIST.append(sockfd)
                 print('Client (%s, %s) connected' % addr)
                 sockfd.send('Welcome to the chatroom'.encode('utf-8'))
-                
-                # Automatically join the "general" chatroom
-                CHATROOM[sockfd] = 'general'
 
             else:
                 try:
