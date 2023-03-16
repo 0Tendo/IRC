@@ -1,95 +1,151 @@
-#server side program for internet relay chat program
-#handles multiple connections
+#a basic server for an IRC chatroom
+#this is the server side of the chatroom
 
 import socket
 import select
+import time
 
+# Set server address and port
 HOST = '127.0.0.1'
 PORT = 8080
-HEADER_LEN = 11
 
-opcodes = {
-    'IRC_OC_ERR': b'\x01',
-    'IRC_OC_SEND_MSG': b'\x02',
-    'IRC_OC_RCV_MSG': b'\x03',
-    'IRC_OC_ENTER': b'\x04',
-    'IRC_OC_EXIT': b'\x05',
-}
+# Set up a list of sockets to keep track of all connected clients
+SOCKET_LIST = []
+RECV_BUFFER = 4096
+CHATROOM = {}
+NICKNAMES = {}
 
-# create server socket object and set socket options
+
+# Set up server socket
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+# Set socket option to allow reuse of address in case of restart
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+# Bind socket to specified address and port
 server.bind((HOST, PORT))
 
-# become a server socket and listen for incoming connections
-server.listen()
+# Start listening for incoming connections, with a maximum backlog of 10 connections
+server.listen(10)
 
-# create list of sockets server initiall - clients added as they join
-user_list = [server]
+# Add server socket to list of sockets to listen for incoming data
+SOCKET_LIST.append(server)
 
-# dictionary of clients
-client_list = {}
+# Define functions for each opcode
 
-# function to receive messages from clients
-def receive_msg(client):
+# Join a chatroom
+def join_chatroom(client, data):
+    if client in CHATROOM:
+        client.send(b'You are already in a chatroom')
+    else:
+        CHATROOM[client] = data
+        client.send(b'You have joined the chatroom: ' + data.encode('utf-8'))
+
+# Leave a chatroom
+def leave_chatroom(client, data):
+    if client in CHATROOM:
+        del CHATROOM[client]
+        client.send(b'You have left the chatroom: ' + data.encode('utf-8'))
+    else:
+        client.send(b'You are not in a chatroom')
+
+# Send a message to all clients in a chatroom
+def send_message(client, data):
+    if client in CHATROOM:
+        for sock in SOCKET_LIST:
+            if sock != server and sock != client:
+                # Use NICKNAMES to get the sender's nickname
+                sender = NICKNAMES.get(client, "Anonymous")
+                message = sender + ': ' + data
+                sock.send(message.encode('utf-8'))
+    else:
+        client.send(b'You are not in a chatroom')
+
+# List all chatrooms
+def list_chatrooms(client, data):
+    if CHATROOM:
+        chatroom_list = 'Chatrooms: ' + ', '.join(set(CHATROOM.values()))
+        client.send(chatroom_list.encode('utf-8'))
+    else:
+        client.send(b'There are no chatrooms')
+
+# Change nickname
+def change_nick(client, data):
+    NICKNAMES[client] = data
+    client.send(b'Your nickname is now: ' + data.encode('utf-8'))
+
+# Quit chatroom
+def quit(client, data):
+    client.send(b'You have quit the chatroom')
+    SOCKET_LIST.remove(client)
+    client.close()
+    if client in CHATROOM:
+        del CHATROOM[client]
+
+# Send error message
+def error(client, data):
+    client.send(b'Error: ' + data)
+
+# Define opcodes (commands) for the chatroom
+opcodes = {
+    'JOIN': join_chatroom,
+    'LEAVE': leave_chatroom,
+    'MSG': send_message,
+    'LIST': list_chatrooms,
+    'NICK': change_nick,
+    'QUIT': quit,
+    'ERROR': error,
+}
+
+# Parse received data to determine opcode and call appropriate function
+def parse_data(client, data):
+    if not data:
+        # Handle empty data
+        return
     try:
-        # First receive message header
-        msg_header = client.recv(HEADER_LEN)
-        # If no header received, assume client has disconnected
-        if not msg_header:
-            return False
-        # Parse message length from header
-        msg_length = int(msg_header.decode('utf-8').strip())
-        # Extract opcode from message header
-        opcode = msg_header[HEADER_LEN:].decode('utf-8').strip()
-        # Receive message data and return as dictionary
-        return {'header': msg_header, 'opcode': opcode, 'data': client.recv(msg_length).strip()}
+        opcode, data = data.decode('utf-8').split(' ', 1)
+    except ValueError:
+        opcode = data.strip()
+        data = None
 
-    # If an error occurs during message receive, assume client has disconnected
-    except:
-        return False
+    if not opcode:
+        # Handle empty opcode
+        client.send(b'Error: Invalid opcode')
+    else:
+        try:
+            opcodes[opcode](client, data)
+        except KeyError:
+            client.send(b'Error: Invalid opcode')
 
-# main loop to handle incoming messages
-while True:
-    # use select() to wait for input from sockets
-    read_sockets, _, exception_sockets = select.select(user_list, [], user_list)
+# Continuously listen for incoming connections and data
+def main():
+    while True:
+        ready_to_read, ready_to_write, in_error = select.select(SOCKET_LIST, [], [], 0)
 
-    # loop through sockets with input
-    for universal_socket in read_sockets:
-        # if the input socket is the server socket, accept the connection
-        if universal_socket == server:
-            # accept new client connection and receive initial username message
-            client, client_address = server.accept()
-            user = receive_msg(client)
-            # if no message received or error occurred, continue waiting for input
-            if user is False:
-                continue
-            # add client socket to list of sockets and add client to dictionary of connected clients
-            user_list.append(client)
-            client_list[client] = user
-            # print connection information to console
-            print(f'New connection from {client_address[0]}:{client_address[1]} username: {user["data"].decode("utf-8")}')
-        else:
-            # receive message from connected client
-            msg = receive_msg(universal_socket)
-            # if no message received or error occurred, assume client has disconnected
-            if msg is False:
-                # print disconnection information to console and remove client from lists/dictionaries
-                print(f'Closed connection from {client_list[universal_socket]["data"].decode("utf-8")}')
-                user_list.remove(universal_socket)
-                del client_list[universal_socket]
-                continue
-            # get sending client's information from dictionary
-            user = client_list[universal_socket]
-            # print received message information to console
-            print(f'Received message from {user["data"].decode("utf-8")}: {msg["data"].decode("utf-8")}')
-            # loop through connected clients (excluding the sending client) and send the received message
-            for client in client_list:
-                if client != universal_socket:
-                    client.send(user['header'] + user['data'] + msg['header'] + msg['data'])
+        for sock in ready_to_read:
+            if sock == server:
+                sockfd, addr = server.accept()
+                SOCKET_LIST.append(sockfd)
+                print('Client (%s, %s) connected' % addr)
+                sockfd.send('Welcome to the chatroom'.encode('utf-8'))
 
-    # loop through sockets with exceptions (e.g. errors or disconnections)
-    for universal_socket in exception_sockets:
-        # remove the socket from the list of sockets and dictionary of clients
-        user_list.remove(universal_socket)
-        del client_list[universal_socket]
+            else:
+                try:
+                    data = sock.recv(RECV_BUFFER)
+                    if data:
+                        parse_data(sock, data)
+                except:
+                    # Handle client disconnect
+                    print("Client (%s, %s) disconnected" % sock.getpeername())
+                    sock.close()
+                    SOCKET_LIST.remove(sock)
+                    if sock in CHATROOM:
+                        del CHATROOM[sock]
+
+        time.sleep(0.1)
+
+if __name__ == "__main__":
+    main()
+
+
+
