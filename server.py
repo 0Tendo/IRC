@@ -52,8 +52,9 @@ def leave_chatroom(client, data):
 # Send a message to all clients in a chatroom
 def send_message(client, data):
     if client in CHATROOM:
-        for sock in SOCKET_LIST:
-            if sock != server and sock != client:
+        chatroom = CHATROOM[client]
+        for sock, room in CHATROOM.items():
+            if room == chatroom and sock != client:
                 # Use NICKNAMES to get the sender's nickname
                 sender = NICKNAMES.get(client, "Anonymous")
                 message = sender + ': ' + data
@@ -65,7 +66,7 @@ def send_message(client, data):
 def list_chatrooms(client, data):
     if CHATROOM:
         chatroom_list = 'Chatrooms: ' + ', '.join(set(CHATROOM.values()))
-        client.send(chatroom_list.encode('utf-8'))
+        client.send((chatroom_list + '\n').encode('utf-8'))
     else:
         client.send(b'There are no chatrooms')
 
@@ -105,7 +106,7 @@ def parse_data(client, data):
     try:
         opcode, data = data.decode('utf-8').split(' ', 1)
     except ValueError:
-        opcode = data.strip()
+        opcode = data.decode('utf-8').strip()
         data = None
 
     if not opcode:
@@ -128,6 +129,9 @@ def main():
                 SOCKET_LIST.append(sockfd)
                 print('Client (%s, %s) connected' % addr)
                 sockfd.send('Welcome to the chatroom'.encode('utf-8'))
+                
+                # Automatically join the "general" chatroom
+                CHATROOM[sockfd] = 'general'
 
             else:
                 try:
@@ -146,6 +150,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
