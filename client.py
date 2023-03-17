@@ -19,6 +19,16 @@ opcodes = {
     6 : 'ERROR',
 }
 
+# opcodes = {
+#     'JOIN': 0,
+#     'LEAVE': 1,
+#     'MSG': 2,
+#     'LIST': 3,
+#     'NICK': 4,
+#     'QUIT': 5,
+#     'ERROR': 6,
+# }
+
 
 def receive_message(client):
     while True:
