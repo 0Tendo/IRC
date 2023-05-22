@@ -9,13 +9,7 @@ Default HOST = '127.0.0.1'
 Default PORT = 8080
 
 
-Implemented functions:
-Change username
-Join room
-Leave room
-List rooms
-List users
-Quit
+Implemented functions: Change username, join room, leave room, list rooms, list users, quit
 
 
 Additional details are outlined in the attached RFC
