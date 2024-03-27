@@ -1,49 +1,49 @@
 An command line interface (CLI) Internet Relay Chat (IRC) server and client I developed for PSU CS494P (Internetworking Protocols)
 
-First, run the server so that clients can connect.
+**First, run the server so that clients can connect.**
 
-_python server.py_
+__python server.py__
 
-Then, connect to the server with a client to begin chatting.
+**Then, connect to the server with a client to begin chatting.**
 
-_python client.py_
+__python client.py__
 
-The client is set to connect locally for demonstrative purposes but can be modified connect to any server!
+**The client is set to connect locally for demonstrative purposes but can be modified connect to any server!**
 
 Default HOST = '127.0.0.1'
 
 Default PORT = 8080
 
 
-Implemented features:
+**Implemented features:**
 
 send messages to everyone in the current chat room
 
-_*any message*_
+*any message*
 
 change username
 
-_/nick *desired username*_
+/nick desired username*
 
 
 join room
 
-_/join *name of room*_
+/join name of room
 
 
 leave room
 
-_/leave *name of room*_
+/leave *name of room*
 
 
 list currently available rooms
 
-_/list_
+/list
 
 
 quit
 
-_/quit_
+/quit
 
 
 Additional details are outlined in the attached RFC
