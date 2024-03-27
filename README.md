@@ -1,4 +1,4 @@
-An command line interface (CLI) Internet Relay Chat (IRC) server and client I developed for PSU CS494P (Internetworking Protocols)
+An command line interface (CLI) Internet Relay Chat (IRC) server and client I developed for PSU CS494P (Internetworking Protocols). Further details in the attached RFC.
 <br><br>
 
 **First, run the server so that clients can connect.**
